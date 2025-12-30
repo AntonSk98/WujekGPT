@@ -39,25 +39,8 @@ func NewAuthService(cache *PersistentCache, token Token) *AuthService {
 	}
 }
 
-// CheckAuth verifies if the given ID is authenticated or attempts to authenticate using the provided message
-func (f *AuthService) CheckAuth(id, message string) error {
-	if f.isAuthenticated(id) {
-		return nil
-	}
-
-	if !f.isAuthRequest(message) {
-		return ErrNotAuthenticated
-	}
-
-	if err := f.authenticate(id, message); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// isAuthenticated checks if the given ID is authenticated
-func (f *AuthService) isAuthenticated(id string) bool {
+// IsAuthenticated checks if the given ID is authenticated
+func (f *AuthService) IsAuthenticated(id string) bool {
 	val, found, err := f.persistentCache.Get(id)
 	if err != nil {
 		log.Printf("Error checking authentication for id %s: %v", id, err)
@@ -75,8 +58,9 @@ func (f *AuthService) isAuthenticated(id string) bool {
 
 }
 
-// authenticate stores the authentication status for the given ID if the token is valid
-func (f *AuthService) authenticate(id string, token string) error {
+// Authenticate stores the authentication status for the given ID if the token is valid
+func (f *AuthService) Authenticate(id string, token string) error {
+	log.Printf("Authenticating id: %s with token: ***", id)
 	if id == "" {
 		return fmt.Errorf("cannot store authentication for empty ID")
 	}

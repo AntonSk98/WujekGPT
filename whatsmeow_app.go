@@ -98,17 +98,7 @@ func (w *WhatsmeowApp) initialize() error {
 
 	// Handle QR code for login if not logged in
 	if !w.client.IsLoggedIn() {
-		qrChan, _ := w.client.GetQRChannel(context.Background())
-		go func() {
-			for evt := range qrChan {
-				if evt.Event == "code" {
-					qr, _ := qrcode.New(evt.Code, qrcode.Medium)
-					fmt.Println(qr.ToSmallString(true))
-				} else {
-					fmt.Println("Login event:", evt.Event)
-				}
-			}
-		}()
+		w.displayQRCode()
 	}
 
 	if err := w.client.Connect(); err != nil {
@@ -118,14 +108,36 @@ func (w *WhatsmeowApp) initialize() error {
 	return nil
 }
 
+// displayQRCode shows the QR code for WhatsApp login
+func (w *WhatsmeowApp) displayQRCode() {
+	qrChan, _ := w.client.GetQRChannel(context.Background())
+	go func() {
+		for evt := range qrChan {
+			if evt.Event == "code" {
+				qr, _ := qrcode.New(evt.Code, qrcode.Low)
+				fmt.Println(qr.ToSmallString(false))
+			} else {
+				fmt.Println("Login event:", evt.Event)
+			}
+		}
+	}()
+}
+
 // OnMessage handles incoming WhatsApp messages
 func (w *WhatsmeowApp) onMessage(msg *events.Message) error {
 	id := msg.Info.Chat.String()
 	message := extractMessage(msg)
 
-	// Check authentication
-	if err := w.authService.CheckAuth(id, message); err != nil {
-		return err
+	if !w.authService.IsAuthenticated(id) {
+		if !w.authService.isAuthRequest(message) {
+			return ErrNotAuthenticated
+		}
+		if err := w.authService.Authenticate(id, message); err != nil {
+			return err
+		}
+
+		fmt.Printf("ID %s authenticated successfully.\n", id)
+		return nil
 	}
 
 	w.eventBus.Publish(OnMessageReceivedTopic, OnMessageReceivedEvent{
@@ -148,6 +160,7 @@ func (w *WhatsmeowApp) setupEventHandler() {
 			fmt.Println("Connected to WhatsApp")
 		case *events.LoggedOut:
 			fmt.Println("Logged out from WhatsApp")
+			w.displayQRCode()
 		}
 	})
 }
